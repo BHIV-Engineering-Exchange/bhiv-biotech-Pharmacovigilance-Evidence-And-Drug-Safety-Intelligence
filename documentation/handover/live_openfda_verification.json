@@ -1,0 +1,31 @@
+{
+  "test": "Live OpenFDA connector verification",
+  "requested_drug": "ibuprofen",
+  "success": true,
+  "source": "OpenFDA/FAERS",
+  "retrieved_at": "2026-11-17T09:11:28.405557+00:00",
+  "source_url": "https://api.fda.gov/drug/event.json?search=patient.drug.medicinalproduct%3A%22ibuprofen%22&limit=5",
+  "record_count": 5,
+  "reports": [
+    {
+      "source_record_id": "10003301",
+      "first_listed_drug": "IBUPROFEN"
+    },
+    {
+      "source_record_id": "10003319",
+      "first_listed_drug": "BENLYSTA"
+    },
+    {
+      "source_record_id": "10003865",
+      "first_listed_drug": "YAZ"
+    },
+    {
+      "source_record_id": "10004019",
+      "first_listed_drug": "EXTAVIA"
+    },
+    {
+      "source_record_id": "10004183",
+      "first_listed_drug": "JAKAFI"
+    }
+  ]
+}
