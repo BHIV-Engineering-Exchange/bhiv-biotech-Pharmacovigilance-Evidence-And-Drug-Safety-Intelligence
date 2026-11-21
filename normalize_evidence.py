@@ -1,4 +1,8 @@
-from src.evidence_schema import EvidenceRecord, generate_evidence_id
+from src.evidence_schema import (
+    EvidenceRecord,
+    generate_evidence_id,
+    ORIGIN_REAL_WORLD,
+)
 from src.entity_resolution import (
     EntityCandidate,
     resolve_entity,
@@ -11,6 +15,7 @@ def normalize_record(
     retrieved_at,
     source_url,
     requested_drug_name=None,
+    data_origin=ORIGIN_REAL_WORLD,
 ):
     """
     Convert one OpenFDA/FAERS record into our standard EvidenceRecord.
@@ -158,6 +163,7 @@ def normalize_record(
         ),
 
         association_type="REPORTED_ASSOCIATION",
+        data_origin=data_origin,
     )
 
     return record

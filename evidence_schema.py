@@ -10,6 +10,17 @@ UNRESOLVED = "UNRESOLVED"
 
 REPORTED_ASSOCIATION = "REPORTED_ASSOCIATION"
 
+ORIGIN_REAL_WORLD = "REAL_WORLD"
+ORIGIN_SYNTHETIC = "SYNTHETIC"
+ORIGIN_BENCHMARK = "BENCHMARK"
+ORIGIN_TEST = "TEST"
+ALLOWED_DATA_ORIGINS = {
+    ORIGIN_REAL_WORLD,
+    ORIGIN_SYNTHETIC,
+    ORIGIN_BENCHMARK,
+    ORIGIN_TEST,
+}
+
 
 @dataclass
 class EvidenceRecord:
@@ -32,6 +43,7 @@ class EvidenceRecord:
     canonical_entity_identifier: Optional[str] = None
 
     association_type: str = REPORTED_ASSOCIATION
+    data_origin: str = ORIGIN_REAL_WORLD
 
     def to_dict(self):
         return asdict(self)
@@ -56,27 +68,43 @@ def generate_evidence_id(
 
 
 def validate_evidence(record: EvidenceRecord):
-    """Validate required evidence-integrity fields."""
+    """Validate required evidence-integrity and type safety fields."""
 
     errors = []
 
-    if not record.evidence_id:
-        errors.append("Missing evidence_id")
+    # Required string fields
+    required_string_fields = [
+        ("evidence_id", "Missing evidence_id"),
+        ("source", "Missing source"),
+        ("evidence_type", "Missing evidence_type"),
+        ("retrieved_at", "Missing retrieved_at"),
+        ("source_url", "Missing source_url"),
+        ("schema_version", "Missing schema_version"),
+    ]
 
-    if not record.source:
-        errors.append("Missing source")
+    for attr, missing_msg in required_string_fields:
+        val = getattr(record, attr, None)
+        if val is None or (isinstance(val, str) and not val.strip()):
+            errors.append(missing_msg)
+        elif not isinstance(val, str):
+            errors.append(f"Invalid type for {attr}: expected str, got {type(val).__name__}")
 
-    if not record.evidence_type:
-        errors.append("Missing evidence_type")
+    # Optional string fields type validation
+    optional_string_fields = [
+        "drug_name",
+        "drug_identifier",
+        "adverse_event",
+        "event_date",
+        "source_record_id",
+        "raw_record_reference",
+        "canonical_entity_name",
+        "canonical_entity_identifier",
+    ]
 
-    if not record.retrieved_at:
-        errors.append("Missing retrieved_at")
-
-    if not record.source_url:
-        errors.append("Missing source_url")
-
-    if not record.schema_version:
-        errors.append("Missing schema_version")
+    for attr in optional_string_fields:
+        val = getattr(record, attr, None)
+        if val is not None and not isinstance(val, str):
+            errors.append(f"Invalid type for {attr}: expected str or None, got {type(val).__name__}")
 
     # ---------------------------------------------------------
     # Provenance validation
@@ -84,9 +112,7 @@ def validate_evidence(record: EvidenceRecord):
 
     if not isinstance(record.provenance, dict):
         errors.append("Provenance must be a dictionary")
-
     else:
-
         required_provenance_fields = [
             "source_system",
             "underlying_dataset",
@@ -95,13 +121,11 @@ def validate_evidence(record: EvidenceRecord):
         ]
 
         for field in required_provenance_fields:
-
             value = record.provenance.get(field)
-
             if value is None or str(value).strip() == "":
-                errors.append(
-                    f"Missing provenance field: {field}"
-                )
+                errors.append(f"Missing provenance field: {field}")
+            elif not isinstance(value, str):
+                errors.append(f"Invalid type for provenance field {field}: expected str")
 
     # ---------------------------------------------------------
     # Entity-resolution validation
@@ -113,14 +137,26 @@ def validate_evidence(record: EvidenceRecord):
         UNRESOLVED,
     }:
         errors.append(
-            "Invalid entity_resolution_status: "
-            f"{record.entity_resolution_status}"
+            f"Invalid entity_resolution_status: {record.entity_resolution_status}"
         )
+
+    # ---------------------------------------------------------
+    # Association-type validation
+    # ---------------------------------------------------------
 
     if record.association_type != REPORTED_ASSOCIATION:
         errors.append(
-            "Invalid association_type: "
-            f"{record.association_type}"
+            f"Invalid association_type: {record.association_type}"
         )
+
+    # ---------------------------------------------------------
+    # Data-origin validation (Synthetic vs Real-world)
+    # ---------------------------------------------------------
+
+    data_origin = getattr(record, "data_origin", None)
+    if not data_origin or not isinstance(data_origin, str) or not data_origin.strip():
+        errors.append("Missing data_origin")
+    elif data_origin not in ALLOWED_DATA_ORIGINS:
+        errors.append(f"Invalid data_origin: {data_origin}")
 
     return len(errors) == 0, errors

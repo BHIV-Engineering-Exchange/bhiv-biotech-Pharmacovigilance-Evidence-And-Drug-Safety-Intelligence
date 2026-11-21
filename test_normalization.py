@@ -133,3 +133,26 @@ def test_normalize_record_handles_malformed_record():
     assert evidence.drug_name is None
     assert evidence.adverse_event is None
     assert evidence.entity_resolution_status == "UNRESOLVED"
+
+
+def test_normalize_record_propagates_data_origin():
+    raw_record = make_raw_record()
+
+    # Default data_origin
+    evidence_default = normalize_record(
+        raw_record,
+        index=1,
+        retrieved_at="2026-08-31T10:00:00+00:00",
+        source_url="https://api.fda.gov/drug/event.json",
+    )
+    assert evidence_default.data_origin == "REAL_WORLD"
+
+    # Explicit data_origin
+    evidence_synthetic = normalize_record(
+        raw_record,
+        index=1,
+        retrieved_at="2026-08-31T10:00:00+00:00",
+        source_url="https://api.fda.gov/drug/event.json",
+        data_origin="SYNTHETIC",
+    )
+    assert evidence_synthetic.data_origin == "SYNTHETIC"

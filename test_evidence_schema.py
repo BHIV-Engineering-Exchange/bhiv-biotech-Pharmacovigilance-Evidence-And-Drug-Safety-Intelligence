@@ -107,3 +107,42 @@ def test_invalid_association_type_fails_validation():
         "Invalid association_type" in error
         for error in errors
     )
+
+
+def test_invalid_data_origin_fails_validation():
+    record = make_valid_record()
+    record.data_origin = "FABRICATED"
+
+    valid, errors = validate_evidence(record)
+
+    assert not valid
+    assert any("Invalid data_origin" in error for error in errors)
+
+
+def test_missing_data_origin_fails_validation():
+    record = make_valid_record()
+    record.data_origin = ""
+
+    valid, errors = validate_evidence(record)
+
+    assert not valid
+    assert "Missing data_origin" in errors
+
+
+def test_valid_data_origins_pass_validation():
+    for origin in ["REAL_WORLD", "SYNTHETIC", "BENCHMARK", "TEST"]:
+        record = make_valid_record()
+        record.data_origin = origin
+        valid, errors = validate_evidence(record)
+        assert valid
+        assert errors == []
+
+
+def test_field_type_validation_fails_for_invalid_types():
+    record = make_valid_record()
+    record.drug_name = 12345  # Not a string
+
+    valid, errors = validate_evidence(record)
+
+    assert not valid
+    assert any("Invalid type for drug_name" in error for error in errors)

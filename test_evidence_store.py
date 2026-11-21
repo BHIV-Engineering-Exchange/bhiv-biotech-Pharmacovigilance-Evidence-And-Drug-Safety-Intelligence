@@ -30,6 +30,7 @@ def make_record(
         "canonical_entity_name": "IBUPROFEN",
         "canonical_entity_identifier": "NDA123456",
         "association_type": "REPORTED_ASSOCIATION",
+        "data_origin": "REAL_WORLD",
     }
 
 
@@ -164,3 +165,50 @@ def test_duplicate_records_in_same_batch_are_added_once(
     stored = evidence_store.load_evidence()
 
     assert len(stored) == 1
+
+
+def test_conflicting_payload_with_same_source_id_is_detected(
+    tmp_path,
+    monkeypatch
+):
+    evidence_file = tmp_path / "evidence_output.json"
+
+    monkeypatch.setattr(
+        evidence_store,
+        "EVIDENCE_FILE",
+        str(evidence_file)
+    )
+
+    record_original = make_record(
+        source_record_id="FAERS-999",
+        adverse_event="NAUSEA"
+    )
+
+    record_conflicting = make_record(
+        source_record_id="FAERS-999",
+        adverse_event="CARDIAC_ARREST"
+    )
+
+    # Store original record
+    added = evidence_store.add_evidence([record_original])
+    assert added == 1
+
+    # Detect conflicts directly
+    conflicts = evidence_store.detect_conflicts([record_conflicting])
+    assert len(conflicts) == 1
+    assert conflicts[0]["source_record_id"] == "FAERS-999"
+    assert any(
+        diff["field"] == "adverse_event"
+        for diff in conflicts[0]["differences"]
+    )
+
+    # Audited storage surfaces the conflict distinctly from exact duplicate
+    audit = evidence_store.add_evidence_with_audit([record_conflicting])
+    assert audit["added"] == 0
+    assert audit["conflicts"] == 1
+    assert audit["duplicates"] == 0
+
+    # Ensure store integrity is maintained
+    stored = evidence_store.load_evidence()
+    assert len(stored) == 1
+    assert stored[0]["adverse_event"] == "NAUSEA"
