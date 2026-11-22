@@ -1,4 +1,4 @@
-﻿import json
+import json
 import runpy
 import pytest
 from pathlib import Path
@@ -128,3 +128,98 @@ def test_10_review_requires_valid_transition_and_reviewer():
     assert item["review_status"] == "IN_REVIEW"
 
 
+def test_11_missing_required_provenance_is_rejected():
+    from src.evidence_schema import EvidenceRecord, validate_evidence
+
+    record = EvidenceRecord(
+        evidence_id="EV-TEST-001",
+        drug_name="Drug A",
+        drug_identifier=None,
+        adverse_event=None,
+        source="PubMed",
+        source_record_id="SRC-001",
+        evidence_type="Literature",
+        event_date=None,
+        retrieved_at="2026-08-01T10:00:00+00:00",
+        source_url="",
+        schema_version="1.1",
+        provenance={
+            "source_system": "PubMed",
+            "underlying_dataset": "",
+            "retrieval_method": "",
+            "transformation": "",
+        },
+        raw_record_reference="test-record",
+        entity_resolution_status="UNRESOLVED",
+        association_type="REPORTED_ASSOCIATION",
+    )
+
+    valid, errors = validate_evidence(record)
+
+    assert not valid
+    assert "Missing source_url" in errors
+    assert "Missing provenance field: underlying_dataset" in errors
+    assert "Missing provenance field: retrieval_method" in errors
+    assert "Missing provenance field: transformation" in errors
+
+
+def test_12_unknown_drug_remains_unresolved():
+    from src.entity_resolution import (
+        EntityCandidate,
+        UNRESOLVED,
+        resolve_entity,
+    )
+
+    candidates = [
+        EntityCandidate(
+            canonical_name="Ibuprofen",
+            identifier="TEST-IBU-001",
+        )
+    ]
+
+    result = resolve_entity("Drug A", candidates)
+
+    assert result.status == UNRESOLVED
+    assert result.canonical_name is None
+    assert result.identifier is None
+
+
+def test_13_synthetic_data_status_remains_unknown():
+    qc_path = BASE / "drug_safety_qc_report.json"
+
+    with qc_path.open("r", encoding="utf-8") as file:
+        report = json.load(file)
+
+    assert report["record_count"] == 10
+    assert all(
+        item["synthetic_data_status"] == "unknown"
+        for item in report["records"]
+    )
+
+
+def test_14_adapter_output_is_deterministic(tmp_path, monkeypatch):
+    main_globals = adapter["main"].__globals__
+
+    monkeypatch.setitem(
+        main_globals,
+        "OUTPUT_FILE",
+        tmp_path / "output.json",
+    )
+    monkeypatch.setitem(
+        main_globals,
+        "QC_FILE",
+        tmp_path / "qc.json",
+    )
+
+    adapter["main"]()
+
+    first_output = (tmp_path / "output.json").read_bytes()
+    first_qc = (tmp_path / "qc.json").read_bytes()
+
+    adapter["main"]()
+
+    second_output = (tmp_path / "output.json").read_bytes()
+    second_qc = (tmp_path / "qc.json").read_bytes()
+
+    assert first_output == second_output
+    assert first_qc == second_qc
