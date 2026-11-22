@@ -268,3 +268,75 @@ validation, duplicate/conflict reporting, and human-review workflow controls.
 It is not a completed production integration. Production readiness depends
 on the pending schema, provenance, data-classification, and receiver
 contract approvals listed above.
+## 15. Additional Verification — 22 November 2026
+
+### 15.1 Native Biomedical Evidence Engine Validation
+
+A separate read-only verification was performed using the existing
+OpenFDA connector and native receiver normalization pipeline.
+
+Test source: OpenFDA / FAERS  
+Requested drug: ibuprofen  
+Retrieved source record ID: 10003301  
+Receiver schema version: 1.1
+
+Receiver provenance:
+- source_system: OpenFDA
+- underlying_dataset: FAERS
+- retrieval_method: REST API
+- transformation: raw JSON -> normalized evidence
+
+Result:
+- Retrieval: SUCCESS
+- Normalization: SUCCESS
+- Receiver validation: VALID
+- Validation errors: None
+- Permanent storage modified: No
+
+This confirms that the native receiver can successfully normalize and
+validate a genuine OpenFDA record.
+
+It does NOT demonstrate successful import of a Drug Safety producer
+record. The OpenFDA record is a separate source record and has not
+been substituted for the Drug Safety fixture.
+
+### 15.2 Drug Safety Valid-Record Integration Blocker
+
+The Drug Safety producer fixture contains 10 records, EV001 through EV010.
+
+The producer metadata references the source version
+'existing_test1_csv'.
+
+A repository-wide search, excluding virtual-environment and Git
+directories, did not locate the referenced CSV file or another
+matching existing_test1 file.
+
+The producer-to-receiver adapter therefore cannot independently verify
+the original source URL, underlying dataset, retrieval method, or
+receiver transformation provenance for these records.
+
+The adapter correctly leaves the required receiver provenance fields
+empty rather than inventing or borrowing provenance from an unrelated
+OpenFDA record.
+
+Current result:
+- Native receiver valid-record test: PASSED.
+- Drug Safety producer-to-receiver valid-record test: BLOCKED.
+- Missing original CSV/source artifact: NOT FOUND IN INSPECTED REPOSITORY.
+- Receiver validation of the 10 staged producer records: 0 valid, 10 invalid.
+- Permanent receiver storage: NOT MODIFIED.
+
+### 15.3 Required Next Action
+
+The Drug Safety producer owner or responsible source-data owner must
+provide the original source artifact or independently verifiable
+record-level provenance.
+
+The responsible schema/provenance owners must confirm the approved
+field mapping and transformation representation.
+
+After these dependencies are resolved, rerun the producer-to-receiver
+valid-record test and record its raw output.
+
+Until then, retain the valid-record integration case as BLOCKED,
+not PASSED.
