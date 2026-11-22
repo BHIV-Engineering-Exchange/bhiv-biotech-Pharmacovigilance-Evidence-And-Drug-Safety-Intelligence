@@ -1,0 +1,23 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Dell\Desktop\Biomedical_Evidence_Engine_Inspection\bhiv-biotech-Pharmacovigilance-Evidence-And-Drug-Safety-Intelligence-main\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Dell\Desktop\Biomedical_Evidence_Engine_Inspection\bhiv-biotech-Pharmacovigilance-Evidence-And-Drug-Safety-Intelligence-main
+configfile: pytest.ini
+collecting ... collected 14 items
+
+integration_work/test_drug_safety_integration.py::test_01_actual_input_has_ten_records PASSED [  7%]
+integration_work/test_drug_safety_integration.py::test_02_original_input_schema_is_preserved PASSED [ 14%]
+integration_work/test_drug_safety_integration.py::test_03_non_dictionary_wrapper_rejected PASSED [ 21%]
+integration_work/test_drug_safety_integration.py::test_04_missing_records_array_rejected PASSED [ 28%]
+integration_work/test_drug_safety_integration.py::test_05_wrong_record_count_rejected PASSED [ 35%]
+integration_work/test_drug_safety_integration.py::test_06_exact_duplicate_detected PASSED [ 42%]
+integration_work/test_drug_safety_integration.py::test_07_same_identifier_different_content_flagged PASSED [ 50%]
+integration_work/test_drug_safety_integration.py::test_08_unrelated_records_not_marked_duplicate PASSED [ 57%]
+integration_work/test_drug_safety_integration.py::test_09_producer_conflict_preserved PASSED [ 64%]
+integration_work/test_drug_safety_integration.py::test_10_review_requires_valid_transition_and_reviewer PASSED [ 71%]
+integration_work/test_drug_safety_integration.py::test_11_missing_required_provenance_is_rejected PASSED [ 78%]
+integration_work/test_drug_safety_integration.py::test_12_unknown_drug_remains_unresolved PASSED [ 85%]
+integration_work/test_drug_safety_integration.py::test_13_synthetic_data_status_remains_unknown PASSED [ 92%]
+integration_work/test_drug_safety_integration.py::test_14_adapter_output_is_deterministic PASSED [100%]
+
+============================= 14 passed in 1.44s ==============================
