@@ -1,7 +1,7 @@
-﻿# Drug Safety Evidence Integration — Technical Handover
+# Drug Safety Evidence Integration — Technical Handover
 
-Date: 20 November 2026
-Project: BHIV Biotech — Drug Safety Evidence Integration
+Date: 22 November 2026  
+Project: BHIV Biotech — Drug Safety Evidence Integration  
 Status: Local staging integration prototype; production integration pending.
 
 ---
@@ -23,42 +23,42 @@ The implementation focuses on:
 
 ## 2. Project Locations
 
-Producer project:
+Producer project:  
 Drug_Safety_QC_Evidence_Map
 
-Receiver project:
+Receiver project:  
 bhiv-biotech-Pharmacovigilance-Evidence-And-Drug-Safety-Intelligence
 
-Integration workspace:
+Integration workspace:  
 integration_work/
 
 ## 3. Files Created
 
-- drug_safety_input.json
+- drug_safety_input.json  
   Staged copy of the producer's normalized evidence input.
 
-- drug_safety_import_adapter.py
+- drug_safety_import_adapter.py  
   Reads the producer wrapper, extracts records, maps fields, validates
   candidate receiver records, and generates staging/QC outputs.
 
-- staged_receiver_records.json
+- staged_receiver_records.json  
   Contains mapped records and preserved original producer records.
 
-- drug_safety_qc_report.json
+- drug_safety_qc_report.json  
   Contains receiver validation results, processing status,
   duplicate/conflict findings, and human-review information.
 
-- duplicate_conflict_checks.py
+- duplicate_conflict_checks.py  
   Identifies exact duplicates, potential duplicates, and same-source-ID
   records with different content. Does not delete or merge evidence.
 
-- review_lifecycle.py
+- review_lifecycle.py  
   Implements controlled review states and reviewer identity requirements.
 
-- test_drug_safety_integration.py
-  Contains 10 automated integration tests.
+- test_drug_safety_integration.py  
+  Contains 14 automated integration tests.
 
-- TEST_RESULTS.md
+- TEST_RESULTS.md  
   Records integration and full regression test results.
 
 ## 4. Input and Provenance
@@ -96,15 +96,15 @@ are preserved in the staging output.
 | drug identifier | Unresolved; not invented |
 | source URL | Missing; not invented |
 
-Important:
+Important:  
 These are prototype mappings, not an approved canonical contract.
 The proposed retrieved_at and provenance mappings require confirmation.
 The receiver's transformation structure also requires agreement.
 
 ## 6. Receiver Validation Results
 
-Total records staged: 10
-Receiver-valid records: 0
+Total records staged: 10  
+Receiver-valid records: 0  
 Receiver-invalid records: 10
 
 The receiver validation identifies these missing fields:
@@ -114,13 +114,13 @@ The receiver validation identifies these missing fields:
 - provenance.retrieval_method: missing in 10 records
 - provenance.transformation: missing in 10 records
 
-Invalid records are retained in staging.
+Invalid records are retained in staging.  
 They are not silently discarded or written into the permanent receiver store.
 
 ## 7. Duplicate and Conflict Results
 
-Records examined: 10
-Duplicate relationships detected: 0
+Records examined: 10  
+Duplicate relationships detected: 0  
 Source-reported conflicts preserved: 1
 
 EV009 retains its producer-reported Conflicting status.
@@ -146,8 +146,8 @@ The workflow supports:
 - COMPLETED
 - ESCALATED
 
-A reviewer ID is required for transitions.
-Direct completion from PENDING is rejected.
+A reviewer ID is required for transitions.  
+Direct completion from PENDING is rejected.  
 Completed reviews cannot be reopened through the implemented transitions.
 
 Safety confirmation and causality confirmation remain false by default.
@@ -157,11 +157,11 @@ actually completed or approved any record.
 
 ## 9. Test Results
 
-Integration tests:
-10 passed, 0 failed.
+Integration tests:  
+14 passed, 0 failed.
 
-Full receiver regression suite:
-57 passed, 0 failed.
+Full receiver regression suite:  
+61 passed, 0 failed.
 
 Coverage includes:
 - Producer input and schema checks.
@@ -246,8 +246,8 @@ Completed:
 - Missing provenance fields reported.
 - Duplicate/conflict checks implemented.
 - Human-review lifecycle implemented.
-- Integration tests: 10/10 passed.
-- Full receiver regression: 57/57 passed.
+- Integration tests: 14/14 passed.
+- Full receiver regression: 61/61 passed.
 - Permanent receiver store protected during staging tests.
 - Test results and handover documentation prepared.
 
@@ -268,4 +268,3 @@ validation, duplicate/conflict reporting, and human-review workflow controls.
 It is not a completed production integration. Production readiness depends
 on the pending schema, provenance, data-classification, and receiver
 contract approvals listed above.
-
