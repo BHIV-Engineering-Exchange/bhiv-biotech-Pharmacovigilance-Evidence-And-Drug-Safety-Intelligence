@@ -70,3 +70,10 @@ def search_drug(drug_name, limit=10):
             "error": f"Invalid JSON response: {error}",
             "retrieved_at": retrieved_at
         }
+
+    except Exception as error:
+        return {
+            "success": False,
+            "error": f"Unexpected API error: {error}",
+            "retrieved_at": retrieved_at
+        }
