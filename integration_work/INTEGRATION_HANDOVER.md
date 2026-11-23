@@ -300,29 +300,42 @@ It does NOT demonstrate successful import of a Drug Safety producer
 record. The OpenFDA record is a separate source record and has not
 been substituted for the Drug Safety fixture.
 
-### 15.2 Drug Safety Valid-Record Integration Blocker
+### 15.2 Drug Safety Source Artifact Verification
 
 The Drug Safety producer fixture contains 10 records, EV001 through EV010.
 
-The producer metadata references the source version
-'existing_test1_csv'.
+A matching CSV artifact was located in the Drug Safety producer project:
 
-A repository-wide search, excluding virtual-environment and Git
-directories, did not locate the referenced CSV file or another
-matching existing_test1 file.
+`evidence_packet/code_packet/source_artifacts/evidence_records.csv`
 
-The producer-to-receiver adapter therefore cannot independently verify
-the original source URL, underlying dataset, retrieval method, or
-receiver transformation provenance for these records.
+GitHub repository:
+https://github.com/BHIV-Engineering-Exchange/bhiv-biotech-Drug_Safety_QC_Evidence_Map
 
-The adapter correctly leaves the required receiver provenance fields
-empty rather than inventing or borrowing provenance from an unrelated
-OpenFDA record.
+The uploaded CSV was downloaded from GitHub and its SHA256 checksum was verified against the local source copy.
+
+SHA256:
+
+`9D3251B4A0AC9001E8E9C6D80F932013C687B5B42755035CA2648DF067FA02C9`
+
+CSV-to-JSON comparison:
+- CSV records: 10
+- JSON records: 10
+- Evidence IDs matched: 10/10
+- Source fields matched: 10/10
+- Drug product fields matched: 10/10
+- Observation fields matched: 10/10
+- Date fields matched: 10/10
+
+This establishes that the CSV is a matching source artifact for the staged producer records.
+
+Limitation: Its identity as the original file referenced by `existing_test1_csv` has not yet been independently confirmed. The CSV comparison does not establish external source URLs, underlying datasets, retrieval methods, or record-level transformation provenance.
 
 Current result:
-- Native receiver valid-record test: PASSED.
+- Matching CSV artifact located and preserved in the producer repository.
+- GitHub and local CSV SHA256: MATCH.
+- CSV-to-JSON record comparison: 10/10 MATCH.
+- Native receiver valid-record test: PASSED separately.
 - Drug Safety producer-to-receiver valid-record test: BLOCKED.
-- Missing original CSV/source artifact: NOT FOUND IN INSPECTED REPOSITORY.
 - Receiver validation of the 10 staged producer records: 0 valid, 10 invalid.
 - Permanent receiver storage: NOT MODIFIED.
 
