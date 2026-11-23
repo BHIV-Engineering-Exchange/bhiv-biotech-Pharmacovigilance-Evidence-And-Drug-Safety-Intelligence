@@ -353,3 +353,29 @@ valid-record test and record its raw output.
 
 Until then, retain the valid-record integration case as BLOCKED,
 not PASSED.
+
+### Mapping Approval Authority Clarification
+
+It has been clarified that temporary repository maintenance responsibility does not authorize Shravani Jambhulkar to formally approve the Drug Safety producer-to-receiver mapping.
+
+MDU retains ownership of schemas, provenance and lineage.
+
+The proposed mapping will remain:
+
+`PROPOSED_MAPPING_PENDING_APPROVAL`
+
+Shravani may continue technical review, compatibility assessment, testing and documentation of recommended corrections.
+
+Formal approval must be obtained from Surendra or the officially designated MDU/schema authority.
+
+If Surendra remains unavailable, the approval request must be escalated to the designated schema/provenance authority.
+
+Following approval, the integration documentation must record:
+
+- Approver's name and authority.
+- Approval date.
+- Approved schema version.
+- Approved mapping version.
+
+**Current decision: Technical review permitted; formal mapping approval pending.**
+
