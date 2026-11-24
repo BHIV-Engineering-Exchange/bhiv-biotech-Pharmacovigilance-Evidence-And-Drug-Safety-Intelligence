@@ -1,0 +1,16 @@
+{
+  "test": "Fresh OpenFDA native receiver validation",
+  "retrieval_success": true,
+  "source_url": "https://api.fda.gov/drug/event.json?search=patient.drug.medicinalproduct%3A%22ibuprofen%22&limit=5",
+  "retrieved_at": "2026-11-23T12:05:10.731983+00:00",
+  "records_retrieved": 5,
+  "selected_source_record_id": "10003301",
+  "selected_drug": "IBUPROFEN",
+  "selected_adverse_event": "Dyspepsia",
+  "receiver_schema_version": "1.1",
+  "receiver_validation": "PASS",
+  "validation_errors": [],
+  "permanent_storage_modified": false,
+  "mapping_approval_status": "PROPOSED_MAPPING_PENDING_APPROVAL",
+  "artifact_folder": "evidence_packet\\point4_openfda_receiver_validation_2026-11-23"
+}

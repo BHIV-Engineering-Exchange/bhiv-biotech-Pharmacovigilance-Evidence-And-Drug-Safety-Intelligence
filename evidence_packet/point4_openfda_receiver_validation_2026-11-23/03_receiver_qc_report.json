@@ -1,0 +1,16 @@
+{
+  "qc_name": "Native OpenFDA Receiver Schema Validation",
+  "execution_timestamp": "2026-11-23T12:05:13.117130+00:00",
+  "source": "OpenFDA/FAERS",
+  "source_record_id": "10003301",
+  "evidence_id": "EV-000000",
+  "receiver_schema_version": "1.1",
+  "validation_function": "evidence_schema.validate_evidence",
+  "receiver_validation_status": "VALID",
+  "validation_error_count": 0,
+  "validation_errors": [],
+  "entity_resolution_status": "MATCHED",
+  "association_type": "REPORTED_ASSOCIATION",
+  "permanent_storage_written": false,
+  "mapping_approval_status": "PROPOSED_MAPPING_PENDING_APPROVAL"
+}

@@ -1,0 +1,25 @@
+{
+  "evidence_id": "EV-000000",
+  "drug_name": "IBUPROFEN",
+  "drug_identifier": "ANDA078682",
+  "adverse_event": "Dyspepsia",
+  "source": "OpenFDA/FAERS",
+  "source_record_id": "10003301",
+  "evidence_type": "FAERS adverse-event report",
+  "event_date": null,
+  "retrieved_at": "2026-11-23T12:05:10.731983+00:00",
+  "source_url": "https://api.fda.gov/drug/event.json?search=patient.drug.medicinalproduct%3A%22ibuprofen%22&limit=5",
+  "schema_version": "1.1",
+  "provenance": {
+    "source_system": "OpenFDA",
+    "underlying_dataset": "FAERS",
+    "retrieval_method": "REST API",
+    "transformation": "raw JSON -> normalized evidence",
+    "source_record_id": "10003301"
+  },
+  "raw_record_reference": "10003301",
+  "entity_resolution_status": "MATCHED",
+  "canonical_entity_name": "IBUPROFEN",
+  "canonical_entity_identifier": "ANDA078682",
+  "association_type": "REPORTED_ASSOCIATION"
+}
