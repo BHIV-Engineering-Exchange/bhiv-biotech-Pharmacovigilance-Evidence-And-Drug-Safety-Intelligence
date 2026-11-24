@@ -38,26 +38,37 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-try:
+if TYPE_CHECKING:
     from fastapi import FastAPI, HTTPException, status
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field, field_validator
     FASTAPI_AVAILABLE = True
-except ImportError:
-    FASTAPI_AVAILABLE = False
-    # Provide stubs so the module can be imported for testing without FastAPI
-    class FastAPI:  # type: ignore
-        def get(self, *a, **kw): return lambda f: f
-        def post(self, *a, **kw): return lambda f: f
-    class HTTPException(Exception):  # type: ignore
-        def __init__(self, status_code=500, detail=None): pass
-    class BaseModel:  # type: ignore
-        pass
-    class Field:  # type: ignore
-        def __init__(self, *a, **kw): pass
-    status = type("status", (), {"HTTP_200_OK": 200, "HTTP_404_NOT_FOUND": 404})()
+else:
+    try:
+        from fastapi import FastAPI, HTTPException, status
+        from fastapi.responses import JSONResponse
+        from pydantic import BaseModel, Field, field_validator
+        FASTAPI_AVAILABLE = True
+    except ImportError:
+        FASTAPI_AVAILABLE = False
+        # Provide stubs so the module can be imported for testing without FastAPI
+        class FastAPI:  # type: ignore
+            def __init__(self, *a, **kw): pass
+            def get(self, *a, **kw): return lambda f: f
+            def post(self, *a, **kw): return lambda f: f
+        class HTTPException(Exception):  # type: ignore
+            def __init__(self, status_code=500, detail=None): pass
+        class BaseModel:  # type: ignore
+            def __init__(self, *a, **kw): pass
+        def Field(*a, **kw):  # type: ignore
+            return None
+        def field_validator(*a, **kw):  # type: ignore
+            return lambda f: f
+        class JSONResponse:  # type: ignore
+            def __init__(self, *a, **kw): pass
+        status = type("status", (), {"HTTP_200_OK": 200, "HTTP_404_NOT_FOUND": 404})()
 
 from src.research_integration import run_research_workflow, validate_research_report
 from src.evidence_schema import validate_evidence

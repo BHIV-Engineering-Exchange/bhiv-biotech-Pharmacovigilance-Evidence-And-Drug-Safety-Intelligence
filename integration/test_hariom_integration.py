@@ -51,9 +51,22 @@ from integration.shared_evidence_contract import (
     from_evidence_record,
 )
 from integration.qc_adapter import (
+    ALLOWED_QC_CATEGORIES,
+    ALLOWED_QC_QUALITY_VALUES,
+    ALLOWED_QC_REVIEWER_STATUSES,
+    ALLOWED_QC_FINAL_REVIEW_STATUSES,
+    EVIDENCE_CATEGORY_MAPPING,
+    EVIDENCE_QUALITY_MAPPING,
+    REVIEWER_STATUS_MAPPING,
     build_qc_record_from_contract,
     get_qc_engine_status,
+    get_qc_schema_definition,
+    map_evidence_category,
+    map_evidence_quality,
+    map_final_review_status,
+    map_reviewer_status,
     validate_qc_record,
+    validate_qc_schema_direct,
 )
 from integration.drug_safety_adapter import (
     get_drug_safety_status,
@@ -343,18 +356,92 @@ class TestValidQCRecord:
             assert result["blocker"] is not None
 
     def test_valid_qc_mapping_built(self):
-        """TEST 6: QC record mapping from contract is built without fabrication."""
+        """TEST 6: QC record mapping from contract produces all 21 required fields with valid formats."""
         contract = make_contract("SYNTH-QC-001")
         qc_rec = build_qc_record_from_contract(contract.to_dict())
+        
+        # Verify schema version and identification
         assert qc_rec["schema_version"] == "1.0.0"
         assert qc_rec["evidence_id"] == contract.evidence_id
+        assert qc_rec["study_id"] == contract.source_record_id
         assert "NOT_REPORTED" in qc_rec["protocol_reference"]
-        assert "_mapping_note" in qc_rec
-        assert "PROPOSED_MAPPING" in qc_rec["_mapping_note"]
+        
+        # Verify array formats (JSON arrays)
+        assert isinstance(qc_rec["deviations"], list), "deviations must be a list/array"
+        assert qc_rec["deviations"] == []
+        assert isinstance(qc_rec["missing_data"], list), "missing_data must be a list/array"
+        assert qc_rec["missing_data"] == []
+
+        # Verify enum mappings
+        assert qc_rec["evidence_category"] == "Clinical"
+        assert qc_rec["evidence_quality"] == "VERIFIED"
+        assert qc_rec["reviewer_status"] == "NOT REVIEWED"
+        assert qc_rec["final_review_status"] == "READY FOR HUMAN REVIEW"
+        assert qc_rec["synthetic_data_declaration"] == "REAL / SOURCE-VERIFIED"
+
+        # Verify synthetic mapping when data_origin is SYNTHETIC
+        contract_synth = make_contract("SYNTH-QC-002")
+        contract_synth.data_origin = "SYNTHETIC"
+        qc_rec_synth = build_qc_record_from_contract(contract_synth.to_dict())
+        assert qc_rec_synth["synthetic_data_declaration"] == "SAMPLE / SYNTHETIC / FOR SOFTWARE TESTING"
+
+        # Verify metadata omission by default (additionalProperties: false)
+        assert "_mapping_note" not in qc_rec
+
+        # Verify optional inclusion when explicitly requested
+        qc_rec_with_note = build_qc_record_from_contract(contract.to_dict(), include_mapping_note=True)
+        assert "_mapping_note" in qc_rec_with_note
+
+    def test_valid_mapped_record_passes_schema_validation(self):
+        """TEST 6: Valid mapped QC record passes Draft 2020-12 schema validation with 0 errors."""
+        contract = make_contract("SYNTH-QC-PASS-001")
+        qc_rec = build_qc_record_from_contract(contract.to_dict())
+        
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is True, f"Schema validation failed: {val_result['errors']}"
+        assert val_result["errors"] == []
+
+    def test_preservation_of_original_input_contract(self):
+        """TEST 6: build_qc_record_from_contract does not mutate the input contract dict."""
+        contract = make_contract("SYNTH-IMMUTABLE-001")
+        contract_dict = contract.to_dict()
+        contract_copy = copy.deepcopy(contract_dict)
+
+        qc_rec = build_qc_record_from_contract(contract_dict)
+
+        # Input contract must remain identical
+        assert contract_dict == contract_copy
+        # Output is a distinct object
+        assert qc_rec is not contract_dict
+
+    def test_human_review_fallback_mapping(self):
+        """TEST 6: Human review pending and review required states map safely to review gates."""
+        contract = make_contract("SYNTH-REVIEW-GATE-001")
+        contract.validation_status = "REVIEW_REQUIRED"
+        contract.human_review_status = "PENDING"
+        
+        qc_rec = build_qc_record_from_contract(contract.to_dict())
+        assert qc_rec["evidence_quality"] == "NEEDS REVIEW"
+        assert qc_rec["reviewer_status"] == "NOT REVIEWED"
+        assert qc_rec["final_review_status"] == "READY FOR HUMAN REVIEW"
+
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is True, f"Schema validation failed: {val_result['errors']}"
+
+    def test_conflicting_record_maps_to_conflicting_quality(self):
+        """TEST 6: Conflicting record maps to CONFLICTING quality enum."""
+        contract = make_contract("SYNTH-CONFLICT-001")
+        contract.conflict_status = "CONFLICT"
+        
+        qc_rec = build_qc_record_from_contract(contract.to_dict())
+        assert qc_rec["evidence_quality"] == "CONFLICTING"
+
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is True, f"Schema validation failed: {val_result['errors']}"
 
 
 # ===========================================================================
-# TEST 7: Invalid QC record
+# TEST 7: Invalid QC record & Schema Rejections
 # ===========================================================================
 
 class TestInvalidQCRecord:
@@ -368,6 +455,70 @@ class TestInvalidQCRecord:
         record = {"schema_version": "1.0.0", "evidence_id": "EV-TEST"}
         result = validate_qc_record(record)
         assert result["qc_status"] in ("FAIL", "SERVICE_BOUNDARY_NOT_MET")
+
+    def test_qc_schema_rejects_unknown_category(self):
+        """TEST 7: Unknown category is preserved transparently and rejected by schema validation."""
+        contract = make_contract("SYNTH-UNKNOWN-CAT-001")
+        contract_dict = contract.to_dict()
+        contract_dict["evidence_type"] = "NON_EXISTENT_LAB_CATEGORY"
+
+        qc_rec = build_qc_record_from_contract(contract_dict)
+        assert qc_rec["evidence_category"] == "NON_EXISTENT_LAB_CATEGORY"
+
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is False
+        assert any("evidence_category" in err or "NON_EXISTENT_LAB_CATEGORY" in err for err in val_result["errors"])
+
+    def test_qc_schema_rejects_invalid_status(self):
+        """TEST 7: Invalid status values fail schema validation."""
+        contract = make_contract("SYNTH-INVALID-STATUS-001")
+        contract_dict = contract.to_dict()
+        contract_dict["validation_status"] = "UNSUPPORTED_STATUS_VALUE"
+
+        qc_rec = build_qc_record_from_contract(contract_dict)
+        assert qc_rec["evidence_quality"] == "UNSUPPORTED_STATUS_VALUE"
+
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is False
+        assert any("evidence_quality" in err or "UNSUPPORTED_STATUS_VALUE" in err for err in val_result["errors"])
+
+    def test_qc_schema_rejects_missing_required_study_id(self):
+        """TEST 7: Missing required field (study_id empty or deleted) fails schema validation."""
+        contract = make_contract("SYNTH-MISSING-STUDY-001")
+        contract_dict = contract.to_dict()
+        contract_dict["source_record_id"] = ""
+
+        qc_rec = build_qc_record_from_contract(contract_dict)
+        assert qc_rec["study_id"] == ""
+
+        val_result = validate_qc_schema_direct(qc_rec)
+        assert val_result["valid"] is False
+        assert any("study_id" in err for err in val_result["errors"])
+
+        # Also test omitted required property
+        del qc_rec["study_id"]
+        val_result2 = validate_qc_schema_direct(qc_rec)
+        assert val_result2["valid"] is False
+        assert any("study_id" in err for err in val_result2["errors"])
+
+    def test_qc_schema_rejects_unstripped_internal_keys(self):
+        """TEST 7: Extra internal keys fail schema validation if not stripped (additionalProperties: false)."""
+        contract = make_contract("SYNTH-EXTRA-KEYS-001")
+        # Explicitly request mapping note
+        qc_rec = build_qc_record_from_contract(contract.to_dict(), include_mapping_note=True)
+        assert "_mapping_note" in qc_rec
+
+        # Direct schema check without stripping internal keys
+        import jsonschema  # type: ignore
+        schema = get_qc_schema_definition()
+        assert schema is not None
+        validator = jsonschema.Draft202012Validator(schema)
+        errors = [e.message for e in validator.iter_errors(qc_rec)]
+        assert any("additionalProperties" in e or "_mapping_note" in e for e in errors)
+
+        # But validate_qc_schema_direct automatically sanitizes internal keys
+        sanitized_result = validate_qc_schema_direct(qc_rec)
+        assert sanitized_result["valid"] is True
 
 
 # ===========================================================================

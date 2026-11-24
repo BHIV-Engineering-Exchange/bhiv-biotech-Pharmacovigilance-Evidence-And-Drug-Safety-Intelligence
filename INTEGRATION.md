@@ -72,9 +72,20 @@ All implementation maintains the canonical baseline established by Jaydeep, resp
 
 ### A. QC Engine Adapter (`integration/qc_adapter.py`)
 - Communicates across the boundary without copying Shyamal's code.
-- Checks dynamic availability of `qc_engine.engine.validate_record`.
-- Maps `SharedEvidenceContract` to QC Engine's Draft-2020-12 schema (`schemas/evidence_qc_schema_v1.0.0.json`).
-- Clearly tags unaligned QC fields (e.g. `protocol_reference`, `deviations`) as `NOT_REPORTED` rather than hallucinating scientific values.
+- Checks dynamic availability of `qc_engine.engine.validate_record` and `process_dataset`.
+- Maps `SharedEvidenceContract` to QC Engine's Draft-2020-12 schema (`schemas/evidence_qc_schema_v1.0.0.json`, 21 required fields, `additionalProperties: false`).
+- **Deterministic Field Formats & Enums:**
+  - `deviations`: Formatted as JSON array (`list[str]`, defaulting to `[]`).
+  - `missing_data`: Formatted as JSON array (`list[str]`, defaulting to `[]`).
+  - `evidence_category`: Deterministically mapped (`"Clinical"` for FAERS reports and clinical observations; `"Preclinical"` for biosimilarity and candidate records; strict passthrough for analytical lab categories).
+  - `evidence_quality`: Deterministically mapped (`"VERIFIED"` for VALID, `"INSUFFICIENT"` for INVALID, `"NEEDS REVIEW"` for REVIEW_REQUIRED/PENDING, `"CONFLICTING"` for CONFLICT).
+  - `reviewer_status`: Deterministically mapped (`"NOT REVIEWED"` for PENDING/NOT_REQUIRED, `"IN REVIEW"` for IN_REVIEW, `"REVIEWED"` for REVIEWED, `"REQUIRES SECOND REVIEW"`, `"CLOSED"`).
+  - `final_review_status`: Deterministically mapped (`"READY FOR HUMAN REVIEW"` for pending/review-required states).
+  - `synthetic_data_declaration`: Deterministically mapped (`"SAMPLE / SYNTHETIC / FOR SOFTWARE TESTING"` or `"REAL / SOURCE-VERIFIED"`).
+  - Unaligned assay fields (`protocol_reference`, `sample_identification`, `control_identification`, `experimental_conditions`, `measurement_method`, `statistical_reporting`, `reproducibility`, `limitations`) default to `"NOT_REPORTED"` without fabricating scientific data.
+  - Internal metadata keys (such as `_mapping_note`) are omitted by default and stripped during validation to comply with `additionalProperties: false`.
+  - Non-destructive: original `SharedEvidenceContract` input dictionary is never mutated.
+  - Direct local validation helper `validate_qc_schema_direct()` enables Draft 2020-12 schema validation independently of package installation.
 
 ### B. Drug Safety Adapter (`integration/drug_safety_adapter.py`)
 - Reads staged outputs (`staged_receiver_records.json` / `drug_safety_input.json`) without mutating them.
@@ -88,7 +99,7 @@ All implementation maintains the canonical baseline established by Jaydeep, resp
 ---
 
 ## 5. Verification Proof
-- Canonical suite: **49 passed**.
-- Hariom integration suite: **52 passed**.
-- Total combined regression suite: **111 passed, 0 failed**.
-- Test runtime: ~2.7 seconds.
+- Canonical baseline suite: **49 passed**.
+- Hariom integration test suite: **70 passed** (covering input validation, retrieval, error handling, QC schema Draft 2020-12 compliance, deduplication, conflict detection, entity resolution, provenance preservation, and API routes).
+- Total combined regression suite: **119 passed, 0 failed**.
+- Test runtime: ~9.4 seconds.

@@ -1,0 +1,5 @@
+disable-search-path-heuristics = true
+search-path = ["."]
+site-package-path = [
+    "venv_hariom/Lib/site-packages"
+]

@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv_hariom/Scripts/python.exe",
+  "python.analysis.autoSearchPaths": false,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ]
+}
