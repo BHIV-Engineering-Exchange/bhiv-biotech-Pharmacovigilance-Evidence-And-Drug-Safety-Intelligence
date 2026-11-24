@@ -49,13 +49,18 @@ except ImportError:
     FASTAPI_AVAILABLE = False
     # Provide stubs so the module can be imported for testing without FastAPI
     class FastAPI:  # type: ignore
+        def __init__(self, *a, **kw): pass
         def get(self, *a, **kw): return lambda f: f
         def post(self, *a, **kw): return lambda f: f
     class HTTPException(Exception):  # type: ignore
         def __init__(self, status_code=500, detail=None): pass
     class BaseModel:  # type: ignore
-        pass
+        def __init__(self, *a, **kw): pass
     class Field:  # type: ignore
+        def __init__(self, *a, **kw): pass
+    def field_validator(*a, **kw):  # type: ignore
+        return lambda f: f
+    class JSONResponse:  # type: ignore
         def __init__(self, *a, **kw): pass
     status = type("status", (), {"HTTP_200_OK": 200, "HTTP_404_NOT_FOUND": 404})()
 

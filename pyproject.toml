@@ -19,3 +19,11 @@ test = [
     "hypothesis>=6.100.0",
 ]
 
+[tool.pyright]
+extraPaths = ["."]
+executionEnvironments = [
+    { root = "." }
+]
+venvPath = "."
+venv = "venv_hariom"
+
