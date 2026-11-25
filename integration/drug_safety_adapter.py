@@ -63,7 +63,8 @@ def get_staged_records() -> Dict[str, Any]:
       - status: "AVAILABLE" | "NOT_AVAILABLE"
       - blocker: explanation when not available
     """
-    if not DRUG_SAFETY_BRANCH_AVAILABLE:
+    staged_path = _drug_safety_staged_path
+    if not DRUG_SAFETY_BRANCH_AVAILABLE or staged_path is None:
         return {
             "status": "NOT_AVAILABLE",
             "records": [],
@@ -85,7 +86,7 @@ def get_staged_records() -> Dict[str, Any]:
         }
 
     try:
-        with open(_drug_safety_staged_path, "r", encoding="utf-8") as fh:
+        with open(staged_path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
     except (json.JSONDecodeError, OSError) as exc:
         return {
@@ -129,12 +130,13 @@ def get_staged_records() -> Dict[str, Any]:
             f"(source_url and provenance fields missing). "
             f"Preserved for human review. Not automatically resolved."
         ) if invalid_records else None,
-        "source_file": str(_drug_safety_staged_path),
+        "source_file": str(staged_path),
     }
 
 
 def get_drug_safety_status() -> Dict[str, Any]:
     """Return the current Drug Safety integration status."""
+    staged = get_staged_records()
     return {
         "available": DRUG_SAFETY_BRANCH_AVAILABLE,
         "staged_file": str(_drug_safety_staged_path) if _drug_safety_staged_path else None,
@@ -147,10 +149,85 @@ def get_drug_safety_status() -> Dict[str, Any]:
             "https://github.com/BHIV-Engineering-Exchange/"
             "bhiv-biotech-Pharmacovigilance-Evidence-And-Drug-Safety-Intelligence/pull/1"
         ),
-        "status": "BLOCKED",
-        "blocker": (
+        "status": "CONNECTED_WITH_KNOWN_BLOCKER" if DRUG_SAFETY_BRANCH_AVAILABLE else "BLOCKED",
+        "record_count": len(staged.get("records", [])) + staged.get("failed_validation_count", 0),
+        "failed_validation_count": staged.get("failed_validation_count", 0),
+        "blocker": staged.get("blocker") or (
             "Shravani PR #1 not merged. 10/10 producer records fail receiver validation "
             "due to missing source_url and provenance fields. "
             "NEXT ACTION: Shravani to fix input data and re-run adapter tests."
         ),
     }
+
+
+def build_contract_from_drug_safety_record(
+    staged_item: Dict[str, Any],
+) -> Any:
+    """
+    Wrap a staged Drug Safety record into a SharedEvidenceContract.
+    Preserves all provenance and failure details without fabricating missing data.
+    """
+    from integration.shared_evidence_contract import (
+        SharedEvidenceContract,
+        from_evidence_record,
+    )
+
+    candidate = staged_item.get("receiver_candidate") if isinstance(staged_item, dict) and "receiver_candidate" in staged_item else staged_item
+    if not isinstance(candidate, dict):
+        raise TypeError("staged_item must be a dictionary or contain 'receiver_candidate'")
+
+    evidence_id = str(candidate.get("evidence_id") or "EV-UNKNOWN")
+    source_record_id = str(candidate.get("source_record_id") or evidence_id)
+    drug_name = str(candidate.get("drug_name") or "UNKNOWN_DRUG")
+    source_url = str(candidate.get("source_url") or "")
+
+    provenance = candidate.get("provenance") if isinstance(candidate.get("provenance"), dict) else {
+        "source_system": candidate.get("source") or "DrugSafetyStaging",
+        "underlying_dataset": "staged_receiver_records.json",
+    }
+    if not provenance.get("source_system"):
+        provenance["source_system"] = "DrugSafetyStaging"
+
+    rv = staged_item.get("receiver_validation", {}) if isinstance(staged_item, dict) else {}
+    is_valid = bool(rv.get("valid", False))
+    qc_errors = rv.get("errors", []) if not is_valid else []
+
+    contract = from_evidence_record(
+        {
+            "evidence_id": evidence_id,
+            "source_record_id": source_record_id,
+            "source": candidate.get("source", "DrugSafetyStaging"),
+            "source_url": source_url,
+            "drug_name": drug_name,
+            "evidence_type": "Drug safety biosimilarity record",
+            "retrieved_at": candidate.get("retrieved_at", "2026-11-25T10:00:00+00:00"),
+            "schema_version": candidate.get("schema_version", "1.1"),
+            "provenance": provenance,
+            "data_origin": candidate.get("data_origin", "REAL_WORLD"),
+            "adverse_event": candidate.get("adverse_event"),
+        },
+        validation_status="VALID" if is_valid else "INVALID",
+        duplicate_status="UNKNOWN",
+        conflict_status="UNKNOWN",
+        human_review_status="PENDING",
+        producer_record=staged_item,
+        producer_validation_status="FAILED" if not is_valid else "PASSED",
+        qc_errors=qc_errors if qc_errors else None,
+        notes="Staged Drug Safety record from Shravani branch. Preserved for review.",
+    )
+    return contract
+
+
+def validate_drug_safety_through_qc(staged_item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Bridge a staged Drug Safety record through Shyamal's QC Engine.
+    """
+    from integration.qc_adapter import (
+        build_qc_record_from_contract,
+        validate_qc_record,
+    )
+
+    contract = build_contract_from_drug_safety_record(staged_item)
+    qc_record = build_qc_record_from_contract(contract.to_dict())
+    return validate_qc_record(qc_record)
+

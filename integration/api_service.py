@@ -81,7 +81,24 @@ from integration.shared_evidence_contract import (
     CONTRACT_VERSION,
 )
 from integration.qc_adapter import validate_qc_record, get_qc_engine_status
-from integration.drug_safety_adapter import get_drug_safety_status
+from integration.drug_safety_adapter import (
+    get_drug_safety_status,
+    get_staged_records,
+    build_contract_from_drug_safety_record,
+    validate_drug_safety_through_qc,
+)
+from integration.drug_discovery_adapter import (
+    get_drug_discovery_status,
+    load_candidate_records,
+    inspect_candidate_record,
+    build_contract_from_candidate,
+    validate_candidate_through_qc,
+)
+from integration.patient_data_adapter import (
+    get_patient_data_status,
+    process_patient_intake,
+    sanitize_patient_identifier,
+)
 
 # ---------------------------------------------------------------------------
 # App instantiation
@@ -171,6 +188,28 @@ class EvidenceGetResponse(BaseModel):
     disclaimer: str
 
 
+class PatientIntakeRequest(BaseModel):
+    report_id: str = Field(..., min_length=1, description="Unique clinical report ID")
+    drug_name: str = Field(..., min_length=1, description="Administered drug name")
+    patient_id: Optional[str] = Field(default=None, description="Patient MRN or ID (pseudonymized on ingest)")
+    adverse_event: Optional[str] = Field(default="UNSPECIFIED_OBSERVATION", description="Observed clinical symptom/reaction")
+    reporter_role: Optional[str] = Field(default="HEALTHCARE_PROFESSIONAL", description="Clinical reporter role")
+    data_origin: Optional[str] = Field(default="REAL_WORLD", description="REAL_WORLD | SYNTHETIC | TEST")
+    store_evidence: Optional[bool] = Field(default=True, description="Whether to persist in evidence store")
+
+
+class PatientIntakeResponse(BaseModel):
+    status: str
+    report_id: str
+    pseudonymized_patient_id: str
+    contract: Optional[Dict[str, Any]]
+    qc_status: Optional[str]
+    qc_result: Optional[Dict[str, Any]]
+    stored: bool
+    human_review_required: bool
+    service_disclaimer: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -183,6 +222,8 @@ def health_check():
     """
     qc_status = get_qc_engine_status()
     ds_status = get_drug_safety_status()
+    disc_status = get_drug_discovery_status()
+    pt_status = get_patient_data_status()
 
     return HealthResponse(
         status="OK",
@@ -203,7 +244,8 @@ def health_check():
         integrations={
             "qc_engine_shyamal": qc_status["status"],
             "drug_safety_shravani": ds_status["status"],
-            "drug_discovery_shamit": "PROPOSED",
+            "drug_discovery_shamit": disc_status["status"],
+            "patient_data": pt_status["status"],
             "fastapi": "AVAILABLE" if FASTAPI_AVAILABLE else "NOT_INSTALLED",
         },
     )
@@ -350,6 +392,92 @@ def get_evidence(evidence_id: str):
     )
 
 
+@app.post(
+    "/api/v1/patient/intake",
+    response_model=PatientIntakeResponse,
+    tags=["Patient Data"],
+    summary="Ingest clinical patient observation with PII protection and QC validation",
+)
+def patient_intake(request: PatientIntakeRequest):
+    """
+    Ingest a clinical patient observation report.
+    - Sanitizes and pseudonymizes direct patient identifiers (PII protection).
+    - Normalizes into a SharedEvidenceContract.
+    - Bridges record to Shyamal's QC Engine for Draft 2020-12 validation.
+    - Persists into audit-backed evidence store.
+    - Enforces mandatory human-review routing.
+    """
+    payload = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+    result = process_patient_intake(
+        payload,
+        store_evidence=request.store_evidence if request.store_evidence is not None else True,
+    )
+    if result["status"] == "REJECTED":
+        raise HTTPException(status_code=400, detail={"errors": result["errors"]})
+
+    return PatientIntakeResponse(
+        status=result["status"],
+        report_id=result["report_id"],
+        pseudonymized_patient_id=result["pseudonymized_patient_id"],
+        contract=result["contract"],
+        qc_status=result.get("qc_status"),
+        qc_result=result.get("qc_result"),
+        stored=result["stored"],
+        human_review_required=result["human_review_required"],
+        service_disclaimer=result["service_disclaimer"],
+    )
+
+
+@app.get(
+    "/api/v1/drug-safety/staged",
+    tags=["Drug Safety"],
+    summary="Retrieve staged Drug Safety records and validation status",
+)
+def drug_safety_staged():
+    """
+    Retrieve staged records from Shravani's Drug Safety workstream.
+    Surfaces the exact validation status and provenance gap without fabricating data.
+    """
+    return get_staged_records()
+
+
+@app.get(
+    "/api/v1/discovery/candidates",
+    tags=["Drug Discovery"],
+    summary="Retrieve Drug Discovery candidate records with score reproducibility audit",
+)
+def discovery_candidates():
+    """
+    Retrieve candidate compounds from Shamit's Drug Discovery repository.
+    Reports reproducibility of scores and missing score_inputs without fabricating values.
+    """
+    status = get_drug_discovery_status()
+    raw_candidates = load_candidate_records()
+    inspections = [inspect_candidate_record(c) for c in raw_candidates]
+    return {
+        "status": status["status"],
+        "available": status["available"],
+        "record_count": len(raw_candidates),
+        "incomplete_score_count": status.get("incomplete_score_input_count", 0),
+        "blocker": status.get("blocker"),
+        "candidates": inspections,
+    }
+
+
+@app.post(
+    "/api/v1/discovery/validate-candidate",
+    tags=["Drug Discovery"],
+    summary="Validate a Drug Discovery candidate record through Shyamal's Preclinical QC Engine",
+)
+def discovery_validate_candidate(candidate_record: Dict[str, Any]):
+    """
+    Bridge a candidate record into Shyamal's QC Engine (Draft 2020-12 Preclinical category).
+    """
+    if not isinstance(candidate_record, dict) or not candidate_record:
+        raise HTTPException(status_code=400, detail="Candidate record must be a non-empty JSON object.")
+    return validate_candidate_through_qc(candidate_record)
+
+
 @app.get(
     "/api/v1/services/status",
     tags=["System"],
@@ -361,10 +489,10 @@ def services_status():
 
     Status values:
       VERIFIED — tested and confirmed working
-      IMPLEMENTED / UNTESTED — code exists but cross-system test not run
+      CONNECTED_WITH_KNOWN_BLOCKER — files present, dependency gap documented
+      CONNECTED_WITH_LIMITATIONS — operational with identified missing score inputs
       PROPOSED — documented but no code or test
       BLOCKED — dependency unavailable
-      SIMULATED — mock only, no real integration
     """
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -382,21 +510,8 @@ def services_status():
             },
             "QCEngine_Shyamal": get_qc_engine_status(),
             "DrugSafety_Shravani": get_drug_safety_status(),
-            "DrugDiscovery_Shamit": {
-                "status": "PROPOSED",
-                "note": (
-                    "calculate_scores_v2.py inspected. "
-                    "KNOWN ISSUE: expects score.score_inputs structure not present in "
-                    "candidate_records_with_provenance.json. "
-                    "Score reproduction not demonstrated. "
-                    "No adapter built — required input structure undefined."
-                ),
-                "blocker": (
-                    "Shamit to clarify score_inputs structure and confirm input data. "
-                    "Hariom cannot fabricate missing score inputs."
-                ),
-                "owner": "Shamit",
-            },
+            "DrugDiscovery_Shamit": get_drug_discovery_status(),
+            "PatientData_ClinicalIntake": get_patient_data_status(),
             "MASTERDB": {"status": "PROPOSED", "note": "Name referenced in documents. No endpoint, SDK or config found.", "owner": "Unknown"},
             "MDU": {"status": "PROPOSED", "note": "Name referenced in documents. No endpoint, SDK or config found.", "owner": "Unknown"},
             "Bucket": {"status": "PROPOSED", "note": "Name referenced in documents. No storage config found.", "owner": "Unknown"},
